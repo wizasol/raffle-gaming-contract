@@ -94,7 +94,7 @@ export const initProject = async () => {
  * @param userAddress The raffle creator's address
  * @param nft_mint The nft_mint address
  * @param ticketPriceSol The ticket price by SOL 
- * @param ticketPriceReap The ticket price by REAP token
+ * @param ticketPricePrey The ticket price by PREY token
  * @param endTimestamp The raffle end timestamp
  * @param winnerCount The winner_cap of this raffle
  * @param whitelisted The variable if 1: winner get NFt as prize and if 0: get whitelist spot
@@ -104,8 +104,9 @@ export const createRaffle = async (
     userAddress: PublicKey,
     nft_mint: PublicKey,
     ticketPriceSol: number,
-    ticketPriceReap: number,
+    ticketPricePrey: number,
     endTimestamp: number,
+    rewardAmount: number,
     winnerCount: number,
     whitelisted: number,
     max: number
@@ -165,10 +166,11 @@ export const createRaffle = async (
     console.log(ix0.destinationAccounts[0].toBase58());
     const tx = await program.rpc.createRaffle(
         bump,
-        new anchor.BN(ticketPriceReap * PREY_DECIMALS),
+        new anchor.BN(ticketPricePrey * PREY_DECIMALS),
         new anchor.BN(ticketPriceSol * DECIMALS),
         new anchor.BN(endTimestamp),
         new anchor.BN(winnerCount),
+        new anchor.BN(rewardAmount),
         new anchor.BN(whitelisted),
         new anchor.BN(max),
         {
@@ -291,6 +293,10 @@ export const claimReward = async (
     );
     console.log("Claimer's NFT Account: ", ix0.destinationAccounts[0]);
 
+    const srcPreyTokenAccount = await getAssociatedTokenAccount(globalAuthority, PREY_TOKEN_MINT);
+    const claimerPreyTokenAccount = await getAssociatedTokenAccount(userAddress, PREY_TOKEN_MINT);
+
+
     let tx;
 
     if (ix0.instructions.length === 0) {
@@ -303,6 +309,8 @@ export const claimReward = async (
                     raffle: raffleKey,
                     claimerNftTokenAccount: ix0.destinationAccounts[0],
                     srcNftTokenAccount,
+                    srcPreyTokenAccount,
+                    claimerPreyTokenAccount,
                     nftMintAddress: nft_mint,
                     tokenProgram: TOKEN_PROGRAM_ID,
                 },
@@ -319,6 +327,8 @@ export const claimReward = async (
                     raffle: raffleKey,
                     claimerNftTokenAccount: ix0.destinationAccounts[0],
                     srcNftTokenAccount,
+                    srcPreyTokenAccount,
+                    claimerPreyTokenAccount,
                     nftMintAddress: nft_mint,
                     tokenProgram: TOKEN_PROGRAM_ID,
                 },
