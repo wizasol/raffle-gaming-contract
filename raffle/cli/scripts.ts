@@ -19,10 +19,11 @@ import { Raffle } from '../target/types/raffle';
 const GLOBAL_AUTHORITY_SEED = "global-authority";
 
 const PROGRAM_ID = "EsBdqM8dL2yH3g3t2BKKLttYnertN7sx4RsVp2Je9szi";
-const REAP_TOKEN_MINT = new PublicKey("2Dm1zu8ERJGBs3NLXt8s8Vor3YHwJye5E2pYhLiMHU4L");
-const RAFFLE_SIZE = 66136;
+const PREY_TOKEN_MINT = new PublicKey("2Dm1zu8ERJGBs3NLXt8s8Vor3YHwJye5E2pYhLiMHU4L");
+// nYDqQVEaQxLYLh8B8oAFXziMT1bcGrAVigZPL1s3dKc
+const RAFFLE_SIZE = 66544;
 const DECIMALS = 1000000000;
-const REAP_DECIMALS = 1000000000;
+const PREY_DECIMALS = 1000000000;
 
 anchor.setProvider(anchor.Provider.local(web3.clusterApiUrl('devnet')));
 const solConnection = anchor.getProvider().connection;
@@ -129,7 +130,7 @@ export const createRaffle = async (
         solConnection,
         userAddress,
         userAddress,
-        [REAP_TOKEN_MINT]
+        [PREY_TOKEN_MINT]
     );
 
     let raffle;
@@ -164,7 +165,7 @@ export const createRaffle = async (
     console.log(ix0.destinationAccounts[0].toBase58());
     const tx = await program.rpc.createRaffle(
         bump,
-        new anchor.BN(ticketPriceReap * REAP_DECIMALS),
+        new anchor.BN(ticketPriceReap * PREY_DECIMALS),
         new anchor.BN(ticketPriceSol * DECIMALS),
         new anchor.BN(endTimestamp),
         new anchor.BN(winnerCount),
@@ -216,7 +217,7 @@ export const buyTicket = async (
 
     const creator = raffleState.creator;
 
-    let userTokenAccount = await getAssociatedTokenAccount(userAddress, REAP_TOKEN_MINT);
+    let userTokenAccount = await getAssociatedTokenAccount(userAddress, PREY_TOKEN_MINT);
 
     const tx = await program.rpc.buyTickets(
         bump,
@@ -227,7 +228,7 @@ export const buyTicket = async (
                 raffle: raffleKey,
                 globalAuthority,
                 creator,
-                tokenMint: REAP_TOKEN_MINT,
+                tokenMint: PREY_TOKEN_MINT,
                 userTokenAccount,
                 tokenProgram: TOKEN_PROGRAM_ID,
                 systemProgram: SystemProgram.programId,

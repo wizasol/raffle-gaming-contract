@@ -36,7 +36,7 @@ pub mod raffle {
      * and zero-account Raffle, owner's nft ATA and global_authority's nft ATA
      * and nft mint address
      * @param global_bump: global authority's bump
-     * @param ticket_price_reap: ticket price by reap
+     * @param ticket_price_prey: ticket price by reap
      * @param ticket_price_sol: ticket price by sol
      * @param end_timestamp: the end time of raffle
      * @param winner_count: how many winners will be get prize
@@ -46,10 +46,11 @@ pub mod raffle {
     pub fn create_raffle(
         ctx: Context<CreateRaffle>,
         global_bump: u8,
-        ticket_price_reap: u64,
+        ticket_price_prey: u64,
         ticket_price_sol: u64,
         end_timestamp: i64,
         winner_count: u64,
+        reward_amount: u64,
         whitelisted: u64,
         max_entrants: u64,
     ) -> ProgramResult {
@@ -80,10 +81,11 @@ pub mod raffle {
 
         raffle.creator = ctx.accounts.admin.key();
         raffle.nft_mint = ctx.accounts.nft_mint_address.key();
-        raffle.ticket_price_reap = ticket_price_reap;
+        raffle.ticket_price_prey = ticket_price_prey;
         raffle.ticket_price_sol = ticket_price_sol;
         raffle.end_timestamp = end_timestamp;
         raffle.max_entrants = max_entrants;
+        raffle.reward_amount = reward_amount;
         raffle.winner_count = winner_count;
         raffle.whitelisted = whitelisted;
 
@@ -100,7 +102,7 @@ pub mod raffle {
     pub fn buy_tickets(ctx: Context<BuyTickets>, global_bump: u8, amount: u64) -> ProgramResult {
         let timestamp = Clock::get()?.unix_timestamp;
         let mut raffle = ctx.accounts.raffle.load_mut()?;
-        if *ctx.accounts.token_mint.key != REAP_TOKEN_MINT.parse::<Pubkey>().unwrap() {
+        if *ctx.accounts.token_mint.key != PREY_TOKEN_MINT.parse::<Pubkey>().unwrap() {
             return Err(RaffleError::NotREAPToken.into());
         }
 
@@ -111,7 +113,7 @@ pub mod raffle {
             return Err(RaffleError::NotEnoughTicketsLeft.into());
         }
 
-        let total_amount_reap = amount * raffle.ticket_price_reap;
+        let total_amount_prey = amount * raffle.ticket_price_prey;
         let total_amount_sol = amount * raffle.ticket_price_sol;
 
         if ctx.accounts.buyer.to_account_info().lamports() < total_amount_sol {
@@ -139,7 +141,7 @@ pub mod raffle {
         let mint_info = &mut &ctx.accounts.token_mint;
         let token_program = &mut &ctx.accounts.token_program;
 
-        if total_amount_reap > 0 {
+        if total_amount_prey > 0 {
             let cpi_accounts = Burn {
                 mint: mint_info.clone(),
                 to: src_account_info.clone(),
@@ -147,7 +149,7 @@ pub mod raffle {
             };
             token::burn(
                 CpiContext::new(token_program.clone().to_account_info(), cpi_accounts),
-                total_amount_reap,
+                total_amount_prey,
             )?;
         }
 
@@ -178,9 +180,16 @@ pub mod raffle {
             raffle.winner_count = raffle.count;
         }
 
-        for j in 0..raffle.winner_count {
+        let count = raffle.winner_count;
+        let mut crt: u64 = 0;
+
+        while crt < count {
             let (player_address, bump) = Pubkey::find_program_address(
-                &[RANDOM_SEED.as_bytes(), timestamp.to_string().as_bytes()],
+                &[
+                    RANDOM_SEED.as_bytes(),
+                    crt.to_string().as_bytes(),
+                    timestamp.to_string().as_bytes(),
+                ],
                 &raffle::ID,
             );
             let char_vec: Vec<char> = player_address.to_string().chars().collect();
@@ -190,11 +199,20 @@ pub mod raffle {
             }
             mul += u64::from(char_vec[7]);
             let winner_index = mul % raffle.count;
-            raffle.winner[j as usize] = raffle.entrants[winner_index as usize];
-            raffle.entrants[winner_index as usize] = raffle.entrants[(raffle.count - 1) as usize];
-            raffle.count -= 1;
-        }
+            let mut flag: u64 = 0;
 
+            for j in 0..crt {
+                if raffle.winner[j as usize] == raffle.entrants[winner_index as usize] {
+                    flag = 1;
+                    break;
+                }
+            }
+            if flag == 0 {
+                raffle.winner[crt as usize] = raffle.entrants[winner_index as usize];
+                raffle.indexes[crt as usize] = winner_index;
+                crt += 1;
+            }
+        }
         Ok(())
     }
 
@@ -211,7 +229,7 @@ pub mod raffle {
         if timestamp < raffle.end_timestamp {
             return Err(RaffleError::RaffleNotEnded.into());
         }
-        if raffle.whitelisted == 1 {
+        if raffle.whitelisted == 2 {
             if raffle.winner[0] != ctx.accounts.claimer.key() {
                 return Err(RaffleError::NotWinner.into());
             }
@@ -235,6 +253,37 @@ pub mod raffle {
                 1,
             )?;
             raffle.claimed_winner[0] = 1;
+        } else if raffle.whitelisted == 1 {
+            for i in 0..raffle.winner_count {
+                if raffle.winner[i as usize] == ctx.accounts.claimer.key() {
+                    if raffle.claimed_winner[i as usize] == 1 {
+                        return Err(RaffleError::WinnersAlreadyDrawn.into());
+                    }
+
+                    if raffle.winner[i as usize] != ctx.accounts.claimer.key() {
+                        return Err(RaffleError::NotWinner.into());
+                    }
+                    let src_token_account = &mut &ctx.accounts.src_prey_token_account;
+                    let dest_token_account = &mut &ctx.accounts.claimer_prey_token_account;
+                    let token_program = &mut &ctx.accounts.token_program;
+                    let seeds = &[GLOBAL_AUTHORITY_SEED.as_bytes(), &[global_bump]];
+                    let signer = &[&seeds[..]];
+                    let cpi_accounts = Transfer {
+                        from: src_token_account.to_account_info().clone(),
+                        to: dest_token_account.to_account_info().clone(),
+                        authority: ctx.accounts.global_authority.to_account_info(),
+                    };
+                    token::transfer(
+                        CpiContext::new_with_signer(
+                            token_program.clone().to_account_info(),
+                            cpi_accounts,
+                            signer,
+                        ),
+                        raffle.reward_amount,
+                    )?;
+                    raffle.claimed_winner[i as usize] = 1;
+                }
+            }
         } else {
             for i in 0..raffle.winner_count {
                 if raffle.winner[i as usize] == ctx.accounts.claimer.key() {
@@ -406,6 +455,12 @@ pub struct ClaimReward<'info> {
         constraint = src_nft_token_account.owner == *global_authority.to_account_info().key,
     )]
     pub src_nft_token_account: CpiAccount<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub src_prey_token_account: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub claimer_prey_token_account: AccountInfo<'info>,
 
     pub nft_mint_address: AccountInfo<'info>,
     pub token_program: Program<'info, Token>,
