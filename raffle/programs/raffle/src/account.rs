@@ -11,6 +11,13 @@ pub struct GlobalPool {
     pub super_admin: Pubkey, // 32
 }
 
+pub const DISCRIMINATOR_LENGTH: usize = 8;
+pub const PUBLIC_KEY_LENGTH: usize = 32;
+
+impl GlobalPool {
+    pub const LEN: usize = DISCRIMINATOR_LENGTH + PUBLIC_KEY_LENGTH;
+}
+
 #[account(zero_copy)]
 pub struct RafflePool {
     // 72+72+32*2000+48*50 = 66544
