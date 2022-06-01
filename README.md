@@ -66,7 +66,7 @@ revealWinner(
 )
 ```
 
-### - As the Winner of Raffle
+### - As the Winner of Raffle 
 Winners can claim rewards by calling `claimReward` function.
 ```js
 claimReward(
