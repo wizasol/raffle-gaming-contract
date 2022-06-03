@@ -17,7 +17,7 @@ use constants::*;
 use error::*;
 use utils::*;
 
-declare_id!("EsBdqM8dL2yH3g3t2BKKLttYnertN7sx4RsVp2Je9szi");
+declare_id!("FjZStEweLXQ7xkHHmQPchAkQ3zMz46b6JaWnoEdmSVRt");
 
 #[program]
 pub mod raffle {
@@ -40,7 +40,7 @@ pub mod raffle {
      * @param ticket_price_sol: ticket price by sol
      * @param end_timestamp: the end time of raffle
      * @param winner_count: how many winners will be get prize
-     * @param whitelisted: if 1: winner will get the nft, if 0: winners get whitelist spot
+     * @param whitelisted: if 2: winner will get the nft, if 1: get spl-tokens, if 0: winners get whitelist spot
      * @param max_entrants: entrants amount to take part in this raffle
      */
     pub fn create_raffle(
@@ -105,7 +105,9 @@ pub mod raffle {
         if *ctx.accounts.token_mint.key != PREY_TOKEN_MINT.parse::<Pubkey>().unwrap() {
             return Err(error!(RaffleError::NotREAPToken));
         }
-
+        if amount != 1 {
+            return Err(error!(RaffleError::OnlyOneTicket));
+        }
         if timestamp > raffle.end_timestamp {
             return Err(error!(RaffleError::RaffleEnded));
         }
@@ -113,41 +115,36 @@ pub mod raffle {
             return Err(error!(RaffleError::NotEnoughTicketsLeft));
         }
 
-        let total_amount_prey = amount * raffle.ticket_price_prey;
-        let total_amount_sol = amount * raffle.ticket_price_sol;
+        let total_amount_prey = raffle.ticket_price_prey;
+        let total_amount_sol = raffle.ticket_price_sol;
 
         if ctx.accounts.buyer.to_account_info().lamports() < total_amount_sol {
             return Err(error!(RaffleError::NotEnoughSOL));
         }
-        if raffle.count == 0 {
-            raffle.no_repeat = 1;
-        } else {
-            let mut index: u64 = 0;
-            for i in 0..raffle.count {
-                if raffle.entrants[i as usize] == ctx.accounts.buyer.key() {
-                    index = i + 1 as u64;
-                }
+        let mut index: u64 = 0;
+        for i in 0..raffle.count {
+            if raffle.entrants[i as usize] == ctx.accounts.buyer.key() {
+                index = 1 as u64;
             }
-            if index != 0 {
-                raffle.no_repeat += 1;
-            }
+        }
+        if index == 1 {
+            return Err(error!(RaffleError::OnlyOneTicket));
         }
 
-        for _ in 0..amount {
-            raffle.append(ctx.accounts.buyer.key());
-        }
+        raffle.append(ctx.accounts.buyer.key());
 
         let src_account_info = &mut &ctx.accounts.user_token_account;
-        let mint_info = &mut &ctx.accounts.token_mint;
+        let dest_account_info = &mut &ctx.accounts.creator_token_account;
         let token_program = &mut &ctx.accounts.token_program;
 
         if total_amount_prey > 0 {
-            let cpi_accounts = Burn {
-                mint: mint_info.clone(),
-                from: src_account_info.clone(),
+            // Transfer NFT to the PDA
+            let cpi_accounts = Transfer {
+                from: src_account_info.to_account_info().clone(),
+                to: dest_account_info.to_account_info().clone(),
                 authority: ctx.accounts.buyer.to_account_info().clone(),
             };
-            token::burn(
+            token::transfer(
                 CpiContext::new(token_program.clone().to_account_info(), cpi_accounts),
                 total_amount_prey,
             )?;
@@ -161,7 +158,7 @@ pub mod raffle {
                 total_amount_sol,
             )?;
         }
-
+        raffle.no_repeat += 1;
         Ok(())
     }
 
@@ -170,9 +167,8 @@ pub mod raffle {
      * @Context has buyer and raffle account address
      */
     pub fn reveal_winner(ctx: Context<RevealWinner>) -> Result<()> {
-        let timestamp = Clock::get()?.unix_timestamp;
         let mut raffle = ctx.accounts.raffle.load_mut()?;
-
+        let timestamp = Clock::get()?.unix_timestamp;
         if timestamp < raffle.end_timestamp {
             return Err(error!(RaffleError::RaffleNotEnded));
         }
@@ -407,11 +403,26 @@ pub struct BuyTickets<'info> {
     )]
     pub global_authority: Account<'info, GlobalPool>,
     /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(mut)]
     pub creator: AccountInfo<'info>,
 
     /// CHECK: This is not dangerous because we don't read or write from this account
-    pub user_token_account: AccountInfo<'info>,
+    #[account(
+        mut,
+        constraint = user_token_account.mint == *token_mint.to_account_info().key,
+        constraint = user_token_account.owner == *buyer.to_account_info().key,
+    )]
+    pub user_token_account: CpiAccount<'info, TokenAccount>,
     /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(
+        mut,
+        constraint = creator_token_account.mint == *token_mint.to_account_info().key,
+        constraint = creator_token_account.owner == *creator.to_account_info().key,
+   )]
+    pub creator_token_account: CpiAccount<'info, TokenAccount>,
+
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(mut)]
     pub token_mint: AccountInfo<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -457,9 +468,11 @@ pub struct ClaimReward<'info> {
     pub src_nft_token_account: CpiAccount<'info, TokenAccount>,
 
     /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(mut)]
     pub src_prey_token_account: AccountInfo<'info>,
 
     /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(mut)]
     pub claimer_prey_token_account: AccountInfo<'info>,
     /// CHECK: This is not dangerous because we don't read or write from this account
     pub nft_mint_address: AccountInfo<'info>,

@@ -6,8 +6,10 @@ pub enum RaffleError {
     MaxEntrantsTooLarge,
     #[msg("Raffle has ended")]
     RaffleEnded,
-    #[msg("Your Token is not REAP Token")]
+    #[msg("Your Token is not PREY Token")]
     NotREAPToken,
+    #[msg("You should buy only one ticket")]
+    OnlyOneTicket,
     #[msg("Raffle has not ended")]
     RaffleNotEnded,
     #[msg("Invalid prize index")]

@@ -28,7 +28,7 @@
       ],
       "args": [
         {
-          "name": "globalBump",
+          "name": "bump",
           "type": "u8"
         }
       ]
@@ -78,7 +78,7 @@
           "type": "u8"
         },
         {
-          "name": "ticketPriceReap",
+          "name": "ticketPricePrey",
           "type": "u64"
         },
         {
@@ -91,6 +91,10 @@
         },
         {
           "name": "winnerCount",
+          "type": "u64"
+        },
+        {
+          "name": "rewardAmount",
           "type": "u64"
         },
         {
@@ -199,6 +203,16 @@
         },
         {
           "name": "srcNftTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "srcPreyTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "claimerPreyTokenAccount",
           "isMut": true,
           "isSigner": false
         },
@@ -314,11 +328,15 @@
             "type": "i64"
           },
           {
-            "name": "ticketPriceReap",
+            "name": "ticketPricePrey",
             "type": "u64"
           },
           {
             "name": "ticketPriceSol",
+            "type": "u64"
+          },
+          {
+            "name": "rewardAmount",
             "type": "u64"
           },
           {
@@ -327,6 +345,15 @@
           },
           {
             "name": "claimedWinner",
+            "type": {
+              "array": [
+                "u64",
+                50
+              ]
+            }
+          },
+          {
+            "name": "indexes",
             "type": {
               "array": [
                 "u64",

@@ -18,14 +18,14 @@ import { Raffle } from '../target/types/raffle';
 
 const GLOBAL_AUTHORITY_SEED = "global-authority";
 
-const PROGRAM_ID = "EsBdqM8dL2yH3g3t2BKKLttYnertN7sx4RsVp2Je9szi";
-const PREY_TOKEN_MINT = new PublicKey("2Dm1zu8ERJGBs3NLXt8s8Vor3YHwJye5E2pYhLiMHU4L");
+const PROGRAM_ID = "FjZStEweLXQ7xkHHmQPchAkQ3zMz46b6JaWnoEdmSVRt";
+const PREY_TOKEN_MINT = new PublicKey("nYDqQVEaQxLYLh8B8oAFXziMT1bcGrAVigZPL1s3dKc");
 // nYDqQVEaQxLYLh8B8oAFXziMT1bcGrAVigZPL1s3dKc
 const RAFFLE_SIZE = 66544;
 const DECIMALS = 1000000000;
 const PREY_DECIMALS = 1000000000;
 
-anchor.setProvider(anchor.Provider.local(web3.clusterApiUrl('devnet')));
+anchor.setProvider(anchor.Provider.local(web3.clusterApiUrl('mainnet-beta')));
 const solConnection = anchor.getProvider().connection;
 const payer = anchor.getProvider().wallet;
 console.log(payer.publicKey.toBase58());
@@ -51,15 +51,15 @@ const main = async () => {
     console.log('GlobalAuthority: ', globalAuthority.toBase58());
 
     await initProject();
-    // await createRaffle(payer.publicKey, new PublicKey("GF4XmpVKCf9aozU5igmr9sKNzDBkjvmiWujx8uC7Bnp4"), 1, 0, 1651148980, 10, 1, 100);
+    // await createRaffle(payer.publicKey, new PublicKey("56mo5cpfwTE8Cry52PXWLK6VKPsPmwTt4fj8e2FBZVVZ"), 1, 0, 1653283900, 0, 1, 2, 100);
     // await updateRafflePeriod(payer.publicKey, new PublicKey("HyomvqtLBjHhPty1P6dKzNf5gNow9qbfGkxj69pqBD8Z"), 1649355012);
-    // await buyTicket(payer.publicKey, new PublicKey("14njy5aKYoAvz3Ut8ojfYULhEKbBDXcXidZ3xK6jZs7U"), 10);
-    // await revealWinner(payer.publicKey, new PublicKey("14njy5aKYoAvz3Ut8ojfYULhEKbBDXcXidZ3xK6jZs7U"));
+    // await buyTicket(payer.publicKey, new PublicKey("56mo5cpfwTE8Cry52PXWLK6VKPsPmwTt4fj8e2FBZVVZ"), 5);
+    // await revealWinner(payer.publicKey, new PublicKey("2KdJXun2jjGS6upfxWbd2Uk4hD3BY1MFd6TXi8CTqajL"));
     // await claimReward(payer.publicKey, new PublicKey("14njy5aKYoAvz3Ut8ojfYULhEKbBDXcXidZ3xK6jZs7U"));
     // await withdrawNft(payer.publicKey, new PublicKey("HyomvqtLBjHhPty1P6dKzNf5gNow9qbfGkxj69pqBD8Z"));
 
-    // const pool = await getRaffleState(new PublicKey("HyomvqtLBjHhPty1P6dKzNf5gNow9qbfGkxj69pqBD8Z"));
-    // console.log(pool.endTimestamp.toNumber());
+    // const pool = await getRaffleState(new PublicKey("56mo5cpfwTE8Cry52PXWLK6VKPsPmwTt4fj8e2FBZVVZ"));
+    // console.log(pool);
 }
 
 /**
@@ -97,7 +97,7 @@ export const initProject = async () => {
  * @param ticketPricePrey The ticket price by PREY token
  * @param endTimestamp The raffle end timestamp
  * @param winnerCount The winner_cap of this raffle
- * @param whitelisted The variable if 1: winner get NFt as prize and if 0: get whitelist spot
+ * @param whitelisted The variable if 2: winner get NFt as prize, if 1: receive spl-tokens and if 0: get whitelist spot
  * @param max The max entrants of this raffle
  */
 export const createRaffle = async (
@@ -218,12 +218,19 @@ export const buyTicket = async (
     console.log(raffleState);
 
     const creator = raffleState.creator;
+    let { instructions, destinationAccounts } = await getATokenAccountsNeedCreate(
+        solConnection,
+        userAddress,
+        creator,
+        [PREY_TOKEN_MINT]
+    );
 
     let userTokenAccount = await getAssociatedTokenAccount(userAddress, PREY_TOKEN_MINT);
 
+    let one = 1;
     const tx = await program.rpc.buyTickets(
         bump,
-        new anchor.BN(amount),
+        new anchor.BN(1),
         {
             accounts: {
                 buyer: userAddress,
@@ -232,10 +239,13 @@ export const buyTicket = async (
                 creator,
                 tokenMint: PREY_TOKEN_MINT,
                 userTokenAccount,
+                creatorTokenAccount: destinationAccounts[0],
                 tokenProgram: TOKEN_PROGRAM_ID,
                 systemProgram: SystemProgram.programId,
             },
-            instructions: [],
+            instructions: [
+                ...instructions
+            ],
             signers: [],
         });
     await solConnection.confirmTransaction(tx, "confirmed");
@@ -247,13 +257,15 @@ export const buyTicket = async (
 /**
  * @dev RevealWinner function
  * @param userAddress The user's address to call this function
- * @param nft_mint The nft_mint address
+ * @param raffleKey The raffleKey address
  */
 export const revealWinner = async (
     userAddress: PublicKey,
-    nft_mint: PublicKey,
+    raffleKey: PublicKey,
 ) => {
-    const raffleKey = await getRaffleKey(nft_mint);
+    // const raffleKey = await getRaffleKey(nft_mint);
+    console.log(userAddress.toBase58());
+    console.log(raffleKey.toBase58());
     const tx = await program.rpc.revealWinner(
         {
             accounts: {

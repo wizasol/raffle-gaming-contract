@@ -1,11 +1,11 @@
-[programs.devnet]
-raffle = "EsBdqM8dL2yH3g3t2BKKLttYnertN7sx4RsVp2Je9szi"
+[programs.mainnet]
+raffle = "FjZStEweLXQ7xkHHmQPchAkQ3zMz46b6JaWnoEdmSVRt"
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "devnet"
+cluster = "mainnet"
 wallet = "/home/ubuntu/apollo/test-keypair.json"
 
 [scripts]
