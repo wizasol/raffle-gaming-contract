@@ -1,4 +1,4 @@
-# ApeX-Raffle-program
+# Raffle-program
 This is the raffle project that winners can receive the raffle NFT, spl-tokens or winners can buy NFTs by low price. You can buy tickets by $Sol and $PREY token.
 
 ## Install Dependencies
